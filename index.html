@@ -1,0 +1,331 @@
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cryptocurrency Price Alert System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            width: 100%;
+            max-width: 800px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1 {
+            color: #1e3c72;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            align-items: center;
+        }
+
+        .input-field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        input {
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            border-color: #1e3c72;
+            outline: none;
+        }
+
+        button {
+            background: #1e3c72;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s ease;
+            justify-self: start;
+            width: 100%;
+            max-width: 200px;
+        }
+
+        button:hover {
+            background: #2a5298;
+        }
+
+        .alerts-container {
+            margin-top: 30px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .alert-item {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .alert-info h3 {
+            color: #1e3c72;
+            margin-bottom: 5px;
+        }
+
+        .alert-info p {
+            color: #666;
+            margin: 2px 0;
+        }
+
+        .current-price {
+            color: #2a5298;
+            font-weight: bold;
+        }
+
+        .delete-btn {
+            background: #ff4444;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: none;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            margin-top: 10px;
+            flex-shrink: 0;
+        }
+
+        .delete-btn:hover {
+            background: #ff0000;
+        }
+
+        .disclaimer {
+            margin-top: 30px;
+            font-size: 14px;
+            color: #555;
+            background: #f0f0f0;
+            border-radius: 8px;
+            padding: 15px;
+            line-height: 1.4;
+            user-select: none;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+
+            .input-group {
+                grid-template-columns: 1fr;
+            }
+
+            button {
+                max-width: 100%;
+            }
+
+            .alert-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .delete-btn {
+                margin-top: 10px;
+                align-self: stretch;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Crypto Price Alert System</h1>
+
+        <div class="input-group">
+            <div class="input-field">
+                <input type="text" id="cryptoInput" placeholder="Cryptocurrency (e.g., BTC, ETH)" />
+            </div>
+            <div class="input-field">
+                <input type="number" id="upperBound" placeholder="Upper Bound ($)" />
+            </div>
+            <div class="input-field">
+                <input type="number" id="lowerBound" placeholder="Lower Bound ($)" />
+            </div>
+            <button id="addAlert">Add Alert</button>
+        </div>
+
+        <div id="alertsList" class="alerts-container"></div>
+
+        <div class="disclaimer" role="note" aria-label="Disclaimer">
+            <strong>Disclaimer:</strong> This Crypto Price Alert System is for informational purposes only and does not constitute financial advice. Cryptocurrency prices are highly volatile and can change rapidly. Always conduct your own research and consult with a financial advisor before making any investment decisions. The system does not guarantee the accuracy or timeliness of price data and is not responsible for any losses incurred.
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://api.coingecko.com/api/v3';
+        let alerts = [];
+
+        document.getElementById('addAlert').addEventListener('click', addNewAlert);
+
+        async function addNewAlert() {
+            const crypto = document.getElementById('cryptoInput').value.toLowerCase().trim();
+            const upperBound = parseFloat(document.getElementById('upperBound').value);
+            const lowerBound = parseFloat(document.getElementById('lowerBound').value);
+
+            if (!crypto || isNaN(upperBound) || isNaN(lowerBound)) {
+                alert('Please fill all fields with valid values');
+                return;
+            }
+
+            if (lowerBound >= upperBound) {
+                alert('Lower Bound must be less than Upper Bound');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/coins/list`);
+                const coinsList = await response.json();
+                const coin = coinsList.find(c => c.id === crypto || c.symbol === crypto);
+
+                if (!coin) {
+                    alert('Invalid cryptocurrency ID or symbol. Please check and try again.');
+                    return;
+                }
+
+                const priceResponse = await fetch(`${API_BASE_URL}/simple/price?ids=${coin.id}&vs_currencies=usd`);
+                const priceData = await priceResponse.json();
+
+                if (!priceData[coin.id]) {
+                    alert('Unable to fetch price for the specified cryptocurrency.');
+                    return;
+                }
+
+                const alertObj = {
+                    id: Date.now(),
+                    crypto: coin.id,
+                    displaySymbol: coin.symbol.toUpperCase(),
+                    upperBound,
+                    lowerBound,
+                    currentPrice: priceData[coin.id].usd
+                };
+
+                alerts.push(alertObj);
+                renderAlerts();
+                clearInputs();
+            } catch (error) {
+                alert('Error adding alert. Please try again.');
+            }
+        }
+
+        function renderAlerts() {
+            const alertsList = document.getElementById('alertsList');
+            alertsList.innerHTML = alerts
+                .map(
+                    alert => `
+                <div class="alert-item" role="region" aria-label="Price alert for ${alert.displaySymbol}">
+                    <div class="alert-info">
+                        <h3>${alert.displaySymbol}</h3>
+                        <p class="current-price" aria-live="polite">Current: $${alert.currentPrice.toFixed(2)}</p>
+                        <p>Upper: $${alert.upperBound.toFixed(2)} | Lower: $${alert.lowerBound.toFixed(2)}</p>
+                    </div>
+                    <button class="delete-btn" aria-label="Delete alert for ${alert.displaySymbol}" onclick="deleteAlert(${alert.id})">Delete</button>
+                </div>
+            `
+                )
+                .join('');
+        }
+
+        function deleteAlert(id) {
+            alerts = alerts.filter(alert => alert.id !== id);
+            renderAlerts();
+        }
+
+        function clearInputs() {
+            document.getElementById('cryptoInput').value = '';
+            document.getElementById('upperBound').value = '';
+            document.getElementById('lowerBound').value = '';
+        }
+
+        async function checkPrices() {
+            if (alerts.length === 0) return;
+
+            try {
+                const uniqueCryptos = [...new Set(alerts.map(alert => alert.crypto))];
+                const cryptoIds = uniqueCryptos.join(',');
+                const response = await fetch(`${API_BASE_URL}/simple/price?ids=${cryptoIds}&vs_currencies=usd`);
+                const data = await response.json();
+
+                alerts.forEach(alert => {
+                    const price = data[alert.crypto]?.usd;
+                    if (!price) return;
+
+                    alert.currentPrice = price;
+
+                    if (price > alert.upperBound) {
+                        showNotification(
+                            `${alert.displaySymbol} price ($${price.toFixed(2)}) is above your upper threshold ($${alert.upperBound.toFixed(2)})`
+                        );
+                    }
+                    if (price < alert.lowerBound) {
+                        showNotification(
+                            `${alert.displaySymbol} price ($${price.toFixed(2)}) is below your lower threshold ($${alert.lowerBound.toFixed(2)})`
+                        );
+                    }
+                });
+
+                renderAlerts();
+            } catch (error) {
+                console.error('Error checking prices:', error);
+            }
+        }
+
+        function showNotification(message) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Crypto Price Alert', { body: message });
+            } else if ('Notification' in window && Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification('Crypto Price Alert', { body: message });
+                    }
+                });
+            }
+        }
+
+        // Check prices every 5 minutes
+        setInterval(checkPrices, 300000);
+
+        // Initial price check
+        checkPrices();
+    </script>
+</body>
+</html>
